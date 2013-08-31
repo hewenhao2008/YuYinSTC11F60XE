@@ -1,0 +1,5 @@
+"STARTUP.obj",
+"YuYin.obj",
+"DS18B20.obj" 
+TO "YuYin" 
+RAMSIZE(256) 
