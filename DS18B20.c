@@ -38,13 +38,10 @@ void Init_DS18B20()
 	Delayus(510);
 	DQ = 1;
 	Delayus(30);
-#if 1	
 	if(DQ)
 	{
-		U1_send('1');
 		Delayus(30);
 	}
-#endif	
 	Delayus(510);
 	DQ = 1;	
 }

@@ -30,46 +30,22 @@ unsigned int c = 0;//计数用
 unsigned int ui = 0;//串口接收数据长度!
 xdata unsigned char US[800];//xdata unsigned char US[256]; //定义串口接收数据变量!
 
-
-void Delay10ms()		//@22.1184MHz
+/*
+void Delay10us()		//@22.1184MHz
 {
-	unsigned char i, j, k;
+	unsigned char i;
 
-	i = 1;
-	j = 216;
-	k = 35;
-	do
-	{
-		do
-		{
-			while (--k);
-		} while (--j);
-	} while (--i);
+	_nop_();
+	i = 52;
+	while (--i);
 }
-
-
-void Delay100ms()		//@22.1184MHz
-{
-	unsigned char i, j, k;
-
-	i = 9;
-	j = 104;
-	k = 139;
-	do
-	{
-		do
-		{
-			while (--k);
-		} while (--j);
-	} while (--i);
-}
-
+*/
 
 void U1_in()//串口1接收数据
 {
 	j = 0; //超时退出!
 	ui = 0;
-	while(j < 50000)//超时退出(大约1ms)!需要测试此值是否正确! 5000
+	while(j < 40000)//超时退出(大约1ms)!需要测试此值是否正确! 5000
 	{
 		if(RI == 1)
 		{
@@ -89,7 +65,7 @@ void U1_in()//串口1接收数据
 
 void U1_send(unsigned char i)//串口1发送单字节数据
 {
-	//TI = 0;			//令接收中断标志位为0（软件清零）
+	TI = 0;			//令接收中断标志位为0（软件清零）
 	SBUF = i;	//接收数据 SBUF 为单片机的接收发送缓冲寄存器
 	while(TI==0);
 	TI = 0;			//令接收中断标志位为0（软件清零）
@@ -112,42 +88,9 @@ void T0Init(void)		//13微秒@22.1184MHz
 	TH0 = 0xE8;		//设置定时重载值
 	TF0 = 0;		//清除TF0标志
 	TR0 = 0;		//定时器0开始计时
-
-	EA = 1;
+	
 	ET0 = 1;
-}
-
-int start_wifi_command()
-{
-	U1_sendS("+++",3);
-	memset(US,0x00,sizeof(US));	
-	U1_in();
-	if(US[0] == 'a')
-	{	
-		memset(US,0x00,sizeof(US));
-		//Delay50ms();
-		U1_send('a');
-		U1_in();			
-		if(strstr(US,"+ok") != NULL)
-		{
-			Wifi_Command_Mode = 1;
-			return 0; //切换成功
-		}	
-	}
-	memset(US,0x00,sizeof(US));
-	return 1;
-}
-
-int start_wifi_data()
-{
-	U1_sendS("AT+ENTM\r\n",9);
-	U1_in();
-	if(strstr(US,"+ok") != NULL)
-	{		
-		Wifi_Command_Mode = 0;
-		return 0; //切换成功
-	}
-	return 1;	
+	EA = 1;
 }
 
 void T0_C1 (void) interrupt 1  using 2 //单片机的中断号1对应的中断:定时器中断0
@@ -156,7 +99,6 @@ void T0_C1 (void) interrupt 1  using 2 //单片机的中断号1对应的中断:定时器中断0
 	if(F == 1)
 	    Y = ~Y;
 }
-
 
 typedef union //char型数据转int型数据类 
 {  
@@ -173,7 +115,6 @@ void U1Init(void)		//115200bps@22.1184MHz
 	BRT = 0xF4;		//设定独立波特率发生器重装值
 	AUXR |= 0x01;		//串口1选择独立波特率发生器为波特率发生器
 	AUXR |= 0x10;		//启动独立波特率发生器
-	ES = 1;
 }
 
 void Rstinit()
@@ -183,24 +124,93 @@ void Rstinit()
 	P1M0 &= ~(1<<4);
 }
 
+/*--------------
+---wifi mode----
+--------------*/
+void Delay10ms()		//@22.1184MHz
+{
+	unsigned char i, j, k;
+
+	i = 1;
+	j = 216;
+	k = 35;
+	do
+	{
+		do
+		{
+			while (--k);
+		} while (--j);
+	} while (--i);
+}
+
+void Delay100ms()		//@22.1184MHz
+{
+	unsigned char i, j, k;
+
+	i = 9;
+	j = 104;
+	k = 139;
+	do
+	{
+		do
+		{
+			while (--k);
+		} while (--j);
+	} while (--i);
+}
+
 void wifi_ap_open_led_blink()
 {
 	//灯闪烁处理
 	WIFI_LED = !WIFI_LED;
 	Delay100ms();
 	Delay100ms();
-	Delay100ms();
-	Delay100ms();
-	Delay100ms();
 	WIFI_LED = !WIFI_LED;	
 }
+
+int start_wifi_command()
+{
+	U1_sendS("+++",3);
+	memset(US,0x00,sizeof(US));	
+	U1_in();
+	if(US[0] == 'a')
+	{	
+		memset(US,0x00,sizeof(US));
+		//Delay50ms();
+		U1_send('a');
+		U1_in();			
+		if(strstr(US,"+ok") != NULL)
+		{
+			Wifi_Command_Mode = 1;
+			memset(US,0x00,sizeof(US));
+			return 0; //切换成功
+		}	
+	}
+	memset(US,0x00,sizeof(US));
+	return 1;
+}
+
+int start_wifi_data()
+{
+	U1_sendS("AT+ENTM\r\n",9);
+	U1_in();
+	if(strstr(US,"+ok") != NULL)
+	{		
+		Wifi_Command_Mode = 0;
+		memset(US,0x00,sizeof(US));
+		return 0; //切换成功
+	}
+	memset(US,0x00,sizeof(US));
+	return 1;	
+}
+
 void main (void)
 {
 	WF = 0;
 	WIFI_LED =LED_ON;// LED_ON;
 	WAKEUP_LED = LED_OFF;
 	U1Init();
-	T0Init();
+	T0Init();	
 	Rstinit();
 	Init_DS18B20();	
 	//CH:<< 			红外采集命令		//CH:长度+数据<<	//采集后返回的数据
@@ -208,6 +218,7 @@ void main (void)
 	//FW:长度+数据<<  	无线发射命令
 	//FS:<<				心跳
 	//网络传来的是byte格式的数据
+	//while(1);
 	while(1)
 	{
 		if(Check_wifi)
@@ -223,7 +234,7 @@ void main (void)
 				U1_sendS("AT+WMODE\r\n",10);
 				Check_wifi = 0;	
 			}
-		}
+		}	
 		WIFI_LED = RST;	
 		if(RST == 0)
 		{
@@ -243,7 +254,7 @@ void main (void)
 				RST_count1 = 0;
 				RST_count2 = 0;
 			}	
-		}	
+		}		
 		if(RI==1)
 		{
 			U1_in();//获取串口发送的SJ数据!
@@ -259,7 +270,7 @@ void main (void)
 							i = 4;//第3与4位是数据长度,从第4位是红外、无线控制数据
 							M.u[0] = US[3];
 							M.u[1] = US[4];
-							j = M.ue;
+							j = M.ue;						
 							TR0 = 1;		//启动定时器0
 							while(i < j)//j是数据长度-1!
 							{
@@ -345,8 +356,7 @@ void main (void)
 						break;
 
 					case 'C'://红外采集!
-
-					   	U1_sendS("CA<<", 4);//返回到主机请按遥控器("<<"在U1_sendS中添加)
+				   	U1_sendS("CA<<", 4);//返回到主机请按遥控器("<<"在U1_sendS中添加)
 						i = 5;//第3与4位是数据长度,从第4位是红外、无线控制数据
 						j = 0;
 						TR0 = 1;		//启动定时器0
@@ -467,11 +477,10 @@ void main (void)
 					default:break;	
 				}
 			}
-			else if(strstr(US,"+ok") != NULL) //收到wifi模块返回的数据
+			else if(strstr(US,"+o") != NULL) //收到wifi模块返回的数据 +ok
 			{
 				if(strstr(US,"AP") != NULL) 	//wifi工作在AP模式
 				{
-					//Delay50ms();
 					Delay10ms();
 					U1_sendS("AT+WAKEY\r\n",10);
 				}
@@ -488,8 +497,8 @@ void main (void)
 						Wifi_Command_Mode = 0;
 					}
 				}
-			}
+			}			
 		}
-		memset(US,0x00,sizeof(US));//一个串口命令执行完毕, 清空
+		US[2] = 0x00;//一个串口命令执行完毕, 清空
 	}
 }
