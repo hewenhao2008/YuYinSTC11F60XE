@@ -17,6 +17,7 @@ sbit RST = P1 ^ 4; //wifi复位RST
 bit F = 0;	  //是否打开38KH方波调制
 bit Wifi_Command_Mode = 0; //=1 wifi工作在命令模式 =0 工作在数据传输模式
 bit Check_wifi = 1;
+bit Wifi_AP_OPEN_MODE = 0;
 unsigned int RST_count1 = 0; //计数
 unsigned int RST_count2 = 0;
 unsigned char Temperature = 0; //温度
@@ -166,6 +167,8 @@ void wifi_ap_open_led_blink()
 	Delay100ms();
 	Delay100ms();
 	WIFI_LED = !WIFI_LED;	
+	Delay100ms();
+	Delay100ms();	
 }
 
 int start_wifi_command()
@@ -254,7 +257,11 @@ void main (void)
 				RST_count1 = 0;
 				RST_count2 = 0;
 			}	
-		}		
+		}	
+		if(Wifi_AP_OPEN_MODE == 1)
+		{
+			wifi_ap_open_led_blink();
+		}
 		if(RI==1)
 		{
 			U1_in();//获取串口发送的SJ数据!
@@ -486,8 +493,14 @@ void main (void)
 				}
 				else if(strstr(US,"OPEN") != NULL) //AP模式下的open加密  
 				{
-					Check_wifi = 1;
-					wifi_ap_open_led_blink();
+					Check_wifi = 0;
+					Wifi_AP_OPEN_MODE = 1;
+					if(start_wifi_data())
+					{
+						Check_wifi = 0;
+						Wifi_Command_Mode = 0;
+					}
+					//wifi_ap_open_led_blink();
 				}
 				else
 				{
@@ -495,9 +508,10 @@ void main (void)
 					{
 						Check_wifi = 0;
 						Wifi_Command_Mode = 0;
+						Wifi_AP_OPEN_MODE = 0;
 					}
 				}
-			}			
+			}
 		}
 		US[2] = 0x00;//一个串口命令执行完毕, 清空
 	}
