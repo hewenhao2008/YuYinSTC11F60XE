@@ -1,4 +1,4 @@
-C51 COMPILER V9.01   YUYIN                                                                 09/06/2013 17:21:16 PAGE 1   
+C51 COMPILER V9.01   YUYIN                                                                 09/09/2013 19:00:55 PAGE 1   
 
 
 C51 COMPILER V9.01, COMPILATION OF MODULE YUYIN
@@ -27,7 +27,7 @@ line level    source
   17          bit F = 0;    //是否打开38KH方波调制
   18          bit Wifi_Command_Mode = 0; //=1 wifi工作在命令模式 =0 工作在数据传输模式
   19          bit Check_wifi = 1;
-  20          bit Wifi_AP_OPEN_MODE = 0;
+  20          unsigned int Wifi_AP_OPEN_MODE = 0;
   21          unsigned int RST_count1 = 0; //计数
   22          unsigned int RST_count2 = 0;
   23          unsigned char Temperature = 0; //温度
@@ -62,7 +62,7 @@ line level    source
   52   2          {
   53   3            US[ui] = SBUF;
   54   3            if(US[ui] == '<' && US[ui - 1] == '<')
-C51 COMPILER V9.01   YUYIN                                                                 09/06/2013 17:21:16 PAGE 2   
+C51 COMPILER V9.01   YUYIN                                                                 09/09/2013 19:00:55 PAGE 2   
 
   55   3              break;
   56   3            RI = 0;
@@ -126,7 +126,7 @@ line level    source
  114   1        SCON = 0x50;    //8位数据,可变波特率
  115   1        AUXR |= 0x04;   //独立波特率发生器时钟为Fosc,即1T
  116   1        BRT = 0xF4;   //设定独立波特率发生器重装值
-C51 COMPILER V9.01   YUYIN                                                                 09/06/2013 17:21:16 PAGE 3   
+C51 COMPILER V9.01   YUYIN                                                                 09/09/2013 19:00:55 PAGE 3   
 
  117   1        AUXR |= 0x01;   //串口1选择独立波特率发生器为波特率发生器
  118   1        AUXR |= 0x10;   //启动独立波特率发生器
@@ -158,400 +158,435 @@ line level    source
  144   2        } while (--i);
  145   1      }
  146          
- 147          void Delay100ms()   //@22.1184MHz
- 148          {
- 149   1        unsigned char i, j, k;
- 150   1      
- 151   1        i = 9;
- 152   1        j = 104;
- 153   1        k = 139;
- 154   1        do
- 155   1        {
- 156   2          do
- 157   2          {
- 158   3            while (--k);
- 159   3          } while (--j);
- 160   2        } while (--i);
- 161   1      }
- 162          
- 163          void wifi_ap_open_led_blink()
- 164          {
- 165   1        //灯闪烁处理
- 166   1        WIFI_LED = !WIFI_LED;
- 167   1        Delay100ms();
- 168   1        Delay100ms();
- 169   1        WIFI_LED = !WIFI_LED; 
- 170   1        Delay100ms();
- 171   1        Delay100ms(); 
- 172   1      }
- 173          
- 174          int start_wifi_command()
- 175          {
- 176   1        U1_sendS("+++",3);
- 177   1        memset(US,0x00,sizeof(US)); 
- 178   1        U1_in();
-C51 COMPILER V9.01   YUYIN                                                                 09/06/2013 17:21:16 PAGE 4   
+ 147          /*
+ 148          void Delay100ms()   //@22.1184MHz
+ 149          {
+ 150            unsigned char i, j, k;
+ 151          
+ 152            i = 9;
+ 153            j = 104;
+ 154            k = 139;
+ 155            do
+ 156            {
+ 157              do
+ 158              {
+ 159                while (--k);
+ 160              } while (--j);
+ 161            } while (--i);
+ 162          }
+ 163          */
+ 164          
+ 165          void Timer1Init(void)   //5毫秒@22.1184MHz
+ 166          {
+ 167   1        AUXR &= 0xBF;   //定时器时钟12T模式
+ 168   1        TMOD &= 0x0F;   //设置定时器模式
+ 169   1        TMOD |= 0x10;   //设置定时器模式
+ 170   1        TL1 = 0x00;   //设置定时初值
+ 171   1        TH1 = 0xDC;   //设置定时初值
+ 172   1        TF1 = 0;    //清除TF1标志
+ 173   1        TR1 = 1;    //定时器1开始计时
+ 174   1        
+ 175   1        ET1 =1;
+ 176   1        EA = 1;
+ 177   1      }
+ 178          
+C51 COMPILER V9.01   YUYIN                                                                 09/09/2013 19:00:55 PAGE 4   
 
- 179   1        if(US[0] == 'a')
- 180   1        { 
- 181   2          memset(US,0x00,sizeof(US));
- 182   2          //Delay50ms();
- 183   2          U1_send('a');
- 184   2          U1_in();      
- 185   2          if(strstr(US,"+ok") != NULL)
- 186   2          {
- 187   3            Wifi_Command_Mode = 1;
- 188   3            memset(US,0x00,sizeof(US));
- 189   3            return 0; //切换成功
- 190   3          } 
- 191   2        }
- 192   1        memset(US,0x00,sizeof(US));
- 193   1        return 1;
- 194   1      }
- 195          
- 196          int start_wifi_data()
- 197          {
- 198   1        U1_sendS("AT+ENTM\r\n",9);
- 199   1        U1_in();
- 200   1        if(strstr(US,"+ok") != NULL)
- 201   1        {   
- 202   2          Wifi_Command_Mode = 0;
- 203   2          memset(US,0x00,sizeof(US));
- 204   2          return 0; //切换成功
- 205   2        }
- 206   1        memset(US,0x00,sizeof(US));
- 207   1        return 1; 
- 208   1      }
- 209          
- 210          void main (void)
+ 179          
+ 180          void T1() interrupt 3 using 3
+ 181          {
+ 182   1        if(Wifi_AP_OPEN_MODE)
+ 183   1        {
+ 184   2          //U1_send('2');
+ 185   2          Wifi_AP_OPEN_MODE++;
+ 186   2          if(Wifi_AP_OPEN_MODE == 50)
+ 187   2          {
+ 188   3            //U1_send('3');
+ 189   3            WIFI_LED = !WIFI_LED;
+ 190   3            Wifi_AP_OPEN_MODE = 1;
+ 191   3          }
+ 192   2        }
+ 193   1        TL1 = 0x00;   //设置定时初值
+ 194   1        TH1 = 0xDC;   //设置定时初值  
+ 195   1        TR1 = 1;    //定时器1开始计时 
+ 196   1      }
+ 197          
+ 198          /*
+ 199          void wifi_ap_open_led_blink()
+ 200          {
+ 201            //灯闪烁处理
+ 202            WIFI_LED = !WIFI_LED;
+ 203            //Delay100ms();
+ 204            Delay50ms();
+ 205            WIFI_LED = !WIFI_LED; 
+ 206            Delay50ms();
+ 207            //Delay100ms(); 
+ 208          }
+ 209          */
+ 210          int start_wifi_command()
  211          {
- 212   1        WF = 0;
- 213   1        WIFI_LED =LED_ON;// LED_ON;
- 214   1        WAKEUP_LED = LED_OFF;
- 215   1        U1Init();
- 216   1        T0Init(); 
- 217   1        Rstinit();
- 218   1        Init_DS18B20(); 
- 219   1        //CH:<<       红外采集命令    //CH:长度+数据<<  //采集后返回的数据
- 220   1        //FH:长度+数据<<  红外发射命令
- 221   1        //FW:长度+数据<<    无线发射命令
- 222   1        //FS:<<       心跳
- 223   1        //网络传来的是byte格式的数据
- 224   1        //while(1);
- 225   1        while(1)
- 226   1        {
- 227   2          if(Check_wifi)
- 228   2          {
- 229   3            if(!Wifi_Command_Mode)
- 230   3            {
- 231   4              start_wifi_command();
- 232   4            }
- 233   3            if(Wifi_Command_Mode)
- 234   3            {
- 235   4              //Delay50ms();
- 236   4              Delay10ms();
- 237   4              U1_sendS("AT+WMODE\r\n",10);
- 238   4              Check_wifi = 0; 
- 239   4            }
- 240   3          } 
-C51 COMPILER V9.01   YUYIN                                                                 09/06/2013 17:21:16 PAGE 5   
+ 212   1        U1_sendS("+++",3);
+ 213   1        memset(US,0x00,sizeof(US)); 
+ 214   1        U1_in();
+ 215   1        if(US[0] == 'a')
+ 216   1        { 
+ 217   2          memset(US,0x00,sizeof(US));
+ 218   2          //Delay50ms();
+ 219   2          U1_send('a');
+ 220   2          U1_in();      
+ 221   2          if(strstr(US,"+ok") != NULL)
+ 222   2          {
+ 223   3            Wifi_Command_Mode = 1;
+ 224   3            memset(US,0x00,sizeof(US));
+ 225   3            return 0; //切换成功
+ 226   3          } 
+ 227   2        }
+ 228   1        memset(US,0x00,sizeof(US));
+ 229   1        return 1;
+ 230   1      }
+ 231          
+ 232          int start_wifi_data()
+ 233          {
+ 234   1        U1_sendS("AT+ENTM\r\n",9);
+ 235   1        U1_in();
+ 236   1        if(strstr(US,"+ok") != NULL)
+ 237   1        {   
+ 238   2          Wifi_Command_Mode = 0;
+ 239   2          memset(US,0x00,sizeof(US));
+ 240   2          return 0; //切换成功
+C51 COMPILER V9.01   YUYIN                                                                 09/09/2013 19:00:55 PAGE 5   
 
- 241   2          WIFI_LED = RST; 
- 242   2          if(RST == 0)
- 243   2          {
- 244   3            while(RST == 0)
- 245   3            {
- 246   4              RST_count1++;
- 247   4              if(RST_count1 == 65535)
- 248   4              {
- 249   5                RST_count1 = 0;
- 250   5                RST_count2++;
- 251   5              }
- 252   4            }
- 253   3            if(RST_count2 >= 5)
- 254   3            {
- 255   4              Wifi_Command_Mode = 0;
- 256   4              Check_wifi = 1;
- 257   4              RST_count1 = 0;
- 258   4              RST_count2 = 0;
- 259   4            } 
- 260   3          } 
- 261   2          if(Wifi_AP_OPEN_MODE == 1)
- 262   2          {
- 263   3            wifi_ap_open_led_blink();
- 264   3          }
- 265   2          if(RI==1)
- 266   2          {
- 267   3            U1_in();//获取串口发送的SJ数据!
- 268   3      
- 269   3            if(US[2] == ':')//接收到正确的控制数据!
- 270   3            {
- 271   4              switch(US[0])
- 272   4              {
- 273   5                case 'F'://红外、无线数据发射!
- 274   5                  WIFI_LED = LED_OFF;
- 275   5                  if(US[1]=='H')//红外
- 276   5                  {             
- 277   6                    i = 4;//第3与4位是数据长度,从第4位是红外、无线控制数据
- 278   6                    M.u[0] = US[3];
- 279   6                    M.u[1] = US[4];
- 280   6                    j = M.ue;           
- 281   6                    TR0 = 1;    //启动定时器0
- 282   6                    while(i < j)//j是数据长度-1!
- 283   6                    {
- 284   7                      T = 0;
- 285   7                      F = 1;
- 286   7                      i++;
- 287   7                      if(US[i] == 0)//&&US[i+1]==0)
- 288   7                      {
- 289   8                        i += 2;
- 290   8                        M.u[0] = US[i];
- 291   8                        i++;  
- 292   8                        M.u[1] = US[i];
- 293   8                      }
- 294   7                      else
- 295   7                      {
- 296   8                        M.u[0] = 0; 
- 297   8                        M.u[1] = US[i];
- 298   8                      }
- 299   7                      while(T < M.ue);
- 300   7      
- 301   7                      T = 0;
- 302   7                      F = 0;
-C51 COMPILER V9.01   YUYIN                                                                 09/06/2013 17:21:16 PAGE 6   
+ 241   2        }
+ 242   1        memset(US,0x00,sizeof(US));
+ 243   1        return 1; 
+ 244   1      }
+ 245          
+ 246          void main (void)
+ 247          {
+ 248   1        WF = 0;
+ 249   1        WIFI_LED =LED_ON;// LED_ON;
+ 250   1        WAKEUP_LED = LED_OFF;
+ 251   1        U1Init();
+ 252   1        T0Init(); 
+ 253   1        Timer1Init();
+ 254   1        Rstinit();
+ 255   1        Init_DS18B20(); 
+ 256   1        //CH:<<       红外采集命令    //CH:长度+数据<<  //采集后返回的数据
+ 257   1        //FH:长度+数据<<  红外发射命令
+ 258   1        //FW:长度+数据<<    无线发射命令
+ 259   1        //FS:<<       心跳
+ 260   1        //网络传来的是byte格式的数据
+ 261   1        //while(1);
+ 262   1        while(1)
+ 263   1        {
+ 264   2          if(Check_wifi)
+ 265   2          {
+ 266   3            if(!Wifi_Command_Mode)
+ 267   3            {
+ 268   4              start_wifi_command();
+ 269   4            }
+ 270   3            if(Wifi_Command_Mode)
+ 271   3            {
+ 272   4              Delay10ms();
+ 273   4              U1_sendS("AT+WMODE\r\n",10);
+ 274   4              Check_wifi = 0; 
+ 275   4            }
+ 276   3          } 
+ 277   2          if(!Wifi_AP_OPEN_MODE)
+ 278   2            WIFI_LED = RST; 
+ 279   2          if(RST == 0)
+ 280   2          {
+ 281   3            TR1 = 0;
+ 282   3            WIFI_LED = RST;
+ 283   3            while(RST == 0)
+ 284   3            {
+ 285   4              RST_count1++;
+ 286   4              if(RST_count1 == 65535)
+ 287   4              {
+ 288   5                RST_count1 = 0;
+ 289   5                RST_count2++;
+ 290   5              }
+ 291   4            }
+ 292   3            if(RST_count2 >= 5)
+ 293   3            {
+ 294   4              Wifi_Command_Mode = 0;
+ 295   4              Check_wifi = 1;
+ 296   4              RST_count1 = 0;
+ 297   4              RST_count2 = 0;
+ 298   4            } 
+ 299   3            TR1 = 1;
+ 300   3          } 
+ 301   2          if(RI==1)
+ 302   2          {
+C51 COMPILER V9.01   YUYIN                                                                 09/09/2013 19:00:55 PAGE 6   
 
- 303   7                      Y = 1;
- 304   7                      i++;
- 305   7                      if(US[i] == 0)//&&uip_appdata[i+1]==0)
- 306   7                      {
- 307   8                        i += 2;
- 308   8                        M.u[0] = US[i];
- 309   8                        i++;  
- 310   8                        M.u[1] = US[i];
- 311   8                      }
- 312   7                      else
- 313   7                      {
- 314   8                        M.u[0] = 0; 
- 315   8                        M.u[1] = US[i];
- 316   8                      }
- 317   7                      while(T < M.ue);                
- 318   7                    }
- 319   6                    TR0 = 0;    //关闭定时器0
- 320   6                    U1_sendS("FH<<", 4); 
- 321   6                    WIFI_LED = LED_ON;
- 322   6                  }
- 323   5                  else if(US[1]=='W')
- 324   5                  {           
- 325   6                    c = 0;
- 326   6                    TR0 = 1;    //启动定时器0
- 327   6                    while(c < 6)//重复次数!
- 328   6                    {
- 329   7                      T = 0;
- 330   7                      WF = 1;
- 331   7                      i = 4;//第3与4位是数据长度,从第5位是红外、无线控制数据
- 332   7                      while(T < 28);//(13 * 808 = 10504同步脉宽!                  
- 333   7                      T = 0;
- 334   7                      WF = 0;
- 335   7                      M.u[0] = US[3];
- 336   7                      M.u[1] = US[4];
- 337   7                      j = M.ue;//主机生成的长度要减1
- 338   7                      while(T < 808);//(13 * 808 = 10504同步脉宽!
- 339   7      
- 340   7                      while(i < j)
- 341   7                      {
- 342   8                        T = 0;
- 343   8                        WF = 1;
- 344   8                        i++;
- 345   8                        while(T < US[i]);
- 346   8      
- 347   8                        T = 0;
- 348   8                        WF = 0;
- 349   8                        i++;//i在此,精准一些
- 350   8                        while(T < US[i]);
- 351   8                      }
- 352   7                      c++;
- 353   7                    }
- 354   6                    TR0 = 0;
- 355   6                    WF = 0;   //关闭定时器0
- 356   6                    U1_sendS("FW<<", 4);
- 357   6                  }
- 358   5                  else if(US[1]=='S')
- 359   5                  {
- 360   6                    U1_sendS("FS<<", 4);
- 361   6                  }
- 362   5      
- 363   5                  break;
- 364   5      
-C51 COMPILER V9.01   YUYIN                                                                 09/06/2013 17:21:16 PAGE 7   
+ 303   3            U1_in();//获取串口发送的SJ数据!
+ 304   3      
+ 305   3            if(US[2] == ':')//接收到正确的控制数据!
+ 306   3            {
+ 307   4              switch(US[0])
+ 308   4              {
+ 309   5                case 'F'://红外、无线数据发射!
+ 310   5                  WIFI_LED = LED_OFF;
+ 311   5                  if(US[1]=='H')//红外
+ 312   5                  {             
+ 313   6                    i = 4;//第3与4位是数据长度,从第4位是红外、无线控制数据
+ 314   6                    M.u[0] = US[3];
+ 315   6                    M.u[1] = US[4];
+ 316   6                    j = M.ue;           
+ 317   6                    TR0 = 1;    //启动定时器0
+ 318   6                    while(i < j)//j是数据长度-1!
+ 319   6                    {
+ 320   7                      T = 0;
+ 321   7                      F = 1;
+ 322   7                      i++;
+ 323   7                      if(US[i] == 0)//&&US[i+1]==0)
+ 324   7                      {
+ 325   8                        i += 2;
+ 326   8                        M.u[0] = US[i];
+ 327   8                        i++;  
+ 328   8                        M.u[1] = US[i];
+ 329   8                      }
+ 330   7                      else
+ 331   7                      {
+ 332   8                        M.u[0] = 0; 
+ 333   8                        M.u[1] = US[i];
+ 334   8                      }
+ 335   7                      while(T < M.ue);
+ 336   7      
+ 337   7                      T = 0;
+ 338   7                      F = 0;
+ 339   7                      Y = 1;
+ 340   7                      i++;
+ 341   7                      if(US[i] == 0)//&&uip_appdata[i+1]==0)
+ 342   7                      {
+ 343   8                        i += 2;
+ 344   8                        M.u[0] = US[i];
+ 345   8                        i++;  
+ 346   8                        M.u[1] = US[i];
+ 347   8                      }
+ 348   7                      else
+ 349   7                      {
+ 350   8                        M.u[0] = 0; 
+ 351   8                        M.u[1] = US[i];
+ 352   8                      }
+ 353   7                      while(T < M.ue);                
+ 354   7                    }
+ 355   6                    TR0 = 0;    //关闭定时器0
+ 356   6                    U1_sendS("FH<<", 4); 
+ 357   6                    WIFI_LED = LED_ON;
+ 358   6                  }
+ 359   5                  else if(US[1]=='W')
+ 360   5                  {           
+ 361   6                    c = 0;
+ 362   6                    TR0 = 1;    //启动定时器0
+ 363   6                    while(c < 6)//重复次数!
+ 364   6                    {
+C51 COMPILER V9.01   YUYIN                                                                 09/09/2013 19:00:55 PAGE 7   
 
- 365   5                case 'C'://红外采集!
- 366   5                  U1_sendS("CA<<", 4);//返回到主机请按遥控器("<<"在U1_sendS中添加)
- 367   5                  i = 5;//第3与4位是数据长度,从第4位是红外、无线控制数据
- 368   5                  j = 0;
- 369   5                  TR0 = 1;    //启动定时器0
- 370   5                  while(i < 756) //长度给这句有关-->>US[2] = i;//第三位是数据长度
- 371   5                  { 
- 372   6                    T = 1;   //应该能提高准确率
- 373   6                    while(JS == 0);
- 374   6                    if(T > 5)
- 375   6                    {
- 376   7                      M.ue = T;
- 377   7                      T = 1;
- 378   7                      if(M.u[0] > 0)
- 379   7                      {
- 380   8                        US[i] = 0;  //将接收的数据发送回去（删除//即生效）
- 381   8                        i++;
- 382   8                        US[i] = 0;  //将接收的数据发送回去（删除//即生效）
- 383   8                        i++;
- 384   8                        US[i] = M.u[0]; //将接收的数据发送回去（删除//即生效）
- 385   8                        i++;
- 386   8                      }
- 387   7                      US[i] = M.u[1];
- 388   7                      i++;  
- 389   7                      while(JS == 1)
- 390   7                      {               
- 391   8                        if(T > 6000)//无数据退出                
- 392   8                        {
- 393   9                          US[i] = 0;
- 394   9                          i++;
- 395   9      
- 396   9                          M.ue = i;
- 397   9                          US[3] = M.u[0];//第3与4位是数据长度(包括数据头,不包括结尾!)
- 398   9                          US[4] = M.u[1];//第3与4位是数据长度(包括数据头,不包括结尾!)
- 399   9                               
- 400   9                          US[i] = '<';
- 401   9                          i++;
- 402   9                          US[i] = '<';
- 403   9                          i++;
- 404   9      
- 405   9                          US[0] = 'C';
- 406   9                          US[1] = 'H';
- 407   9                          US[2] = ':';                                  
- 408   9                          U1_sendS(US, i);//红外采集成功
- 409   9      
- 410   9                          i = 756;
- 411   9                          break;
- 412   9                        }
- 413   8                      }
- 414   7                      if(i < 756)
- 415   7                      {       
- 416   8                        M.ue = T;
- 417   8              
- 418   8                        if(M.u[0] > 0)
- 419   8                        {
- 420   9                          US[i] = 0;
- 421   9                          i++;
- 422   9                          US[i] = 0;
- 423   9                          i++;
- 424   9                          US[i] = M.u[0];
- 425   9                          i++;
- 426   9                        }
-C51 COMPILER V9.01   YUYIN                                                                 09/06/2013 17:21:16 PAGE 8   
+ 365   7                      T = 0;
+ 366   7                      WF = 1;
+ 367   7                      i = 4;//第3与4位是数据长度,从第5位是红外、无线控制数据
+ 368   7                      while(T < 28);//(13 * 808 = 10504同步脉宽!                  
+ 369   7                      T = 0;
+ 370   7                      WF = 0;
+ 371   7                      M.u[0] = US[3];
+ 372   7                      M.u[1] = US[4];
+ 373   7                      j = M.ue;//主机生成的长度要减1
+ 374   7                      while(T < 808);//(13 * 808 = 10504同步脉宽!
+ 375   7      
+ 376   7                      while(i < j)
+ 377   7                      {
+ 378   8                        T = 0;
+ 379   8                        WF = 1;
+ 380   8                        i++;
+ 381   8                        while(T < US[i]);
+ 382   8      
+ 383   8                        T = 0;
+ 384   8                        WF = 0;
+ 385   8                        i++;//i在此,精准一些
+ 386   8                        while(T < US[i]);
+ 387   8                      }
+ 388   7                      c++;
+ 389   7                    }
+ 390   6                    TR0 = 0;
+ 391   6                    WF = 0;   //关闭定时器0
+ 392   6                    U1_sendS("FW<<", 4);
+ 393   6                  }
+ 394   5                  else if(US[1]=='S')
+ 395   5                  {
+ 396   6                    U1_sendS("FS<<", 4);
+ 397   6                  }
+ 398   5      
+ 399   5                  break;
+ 400   5      
+ 401   5                case 'C'://红外采集!
+ 402   5                  U1_sendS("CA<<", 4);//返回到主机请按遥控器("<<"在U1_sendS中添加)
+ 403   5                  i = 5;//第3与4位是数据长度,从第4位是红外、无线控制数据
+ 404   5                  j = 0;
+ 405   5                  TR0 = 1;    //启动定时器0
+ 406   5                  while(i < 756) //长度给这句有关-->>US[2] = i;//第三位是数据长度
+ 407   5                  { 
+ 408   6                    T = 1;   //应该能提高准确率
+ 409   6                    while(JS == 0);
+ 410   6                    if(T > 5)
+ 411   6                    {
+ 412   7                      M.ue = T;
+ 413   7                      T = 1;
+ 414   7                      if(M.u[0] > 0)
+ 415   7                      {
+ 416   8                        US[i] = 0;  //将接收的数据发送回去（删除//即生效）
+ 417   8                        i++;
+ 418   8                        US[i] = 0;  //将接收的数据发送回去（删除//即生效）
+ 419   8                        i++;
+ 420   8                        US[i] = M.u[0]; //将接收的数据发送回去（删除//即生效）
+ 421   8                        i++;
+ 422   8                      }
+ 423   7                      US[i] = M.u[1];
+ 424   7                      i++;  
+ 425   7                      while(JS == 1)
+ 426   7                      {               
+C51 COMPILER V9.01   YUYIN                                                                 09/09/2013 19:00:55 PAGE 8   
 
- 427   8                        US[i] = M.u[1];
- 428   8                        i++;
- 429   8                        j = 0;
- 430   8                      }
- 431   7                    }
- 432   6                    else
- 433   6                    {
- 434   7                      while(JS == 1)
- 435   7                      {
- 436   8                        if(T > 50000)
- 437   8                        {
- 438   9                          T = 0;
- 439   9                          j++;
- 440   9                          if(j > 30)
- 441   9                          {
- 442  10                            i = 756;
- 443  10                            U1_sendS("CC<<", 4);//超时退出!大约20秒无操作退出!
- 444  10                            break;
- 445  10                          }
- 446   9                        }
- 447   8                      }
- 448   7                    }
- 449   6                  }
- 450   5                  TR0 = 0;    //关闭定时器0
- 451   5                  break;
- 452   5                case 'D':   //温度
- 453   5                    if(US[1] == 'T')
- 454   5                    {
- 455   6                      memset(US,0x00,sizeof(US));
- 456   6                      US[0] = 'D';
- 457   6                      US[1] = 'T';
- 458   6                      while((US[2] = GetTemperature()) == 0x55);
- 459   6                      US[3] = '<';
- 460   6                      US[4] = '<';
- 461   6                      U1_sendS(US, 5);
- 462   6                    }
- 463   5                    break;
- 464   5                case 'L': //唤醒状态指示灯
- 465   5                    if(US[1] == 'B')
- 466   5                    {
- 467   6                      WAKEUP_LED = LED_ON;
- 468   6                      U1_sendS("LB<<",4);
- 469   6                    } 
- 470   5                    else if(US[1] == 'D')
- 471   5                    {
- 472   6                      WAKEUP_LED = LED_OFF;
- 473   6                      U1_sendS("LD<<",4);
- 474   6                    }
- 475   5                    break;
- 476   5                case 'S': //wifi复位
- 477   5                    if(US[1] == 'D')
- 478   5                    {
- 479   6                      Check_wifi = 1;
- 480   6                      Wifi_Command_Mode = 0;
- 481   6                      U1_sendS("SD<<",4);
- 482   6                    }
- 483   5                    break;
- 484   5                default:break;  
- 485   5              }
- 486   4            }
- 487   3            else if(strstr(US,"+o") != NULL) //收到wifi模块返回的数据 +ok
- 488   3            {
-C51 COMPILER V9.01   YUYIN                                                                 09/06/2013 17:21:16 PAGE 9   
+ 427   8                        if(T > 6000)//无数据退出                
+ 428   8                        {
+ 429   9                          US[i] = 0;
+ 430   9                          i++;
+ 431   9      
+ 432   9                          M.ue = i;
+ 433   9                          US[3] = M.u[0];//第3与4位是数据长度(包括数据头,不包括结尾!)
+ 434   9                          US[4] = M.u[1];//第3与4位是数据长度(包括数据头,不包括结尾!)
+ 435   9                               
+ 436   9                          US[i] = '<';
+ 437   9                          i++;
+ 438   9                          US[i] = '<';
+ 439   9                          i++;
+ 440   9      
+ 441   9                          US[0] = 'C';
+ 442   9                          US[1] = 'H';
+ 443   9                          US[2] = ':';                                  
+ 444   9                          U1_sendS(US, i);//红外采集成功
+ 445   9      
+ 446   9                          i = 756;
+ 447   9                          break;
+ 448   9                        }
+ 449   8                      }
+ 450   7                      if(i < 756)
+ 451   7                      {       
+ 452   8                        M.ue = T;
+ 453   8              
+ 454   8                        if(M.u[0] > 0)
+ 455   8                        {
+ 456   9                          US[i] = 0;
+ 457   9                          i++;
+ 458   9                          US[i] = 0;
+ 459   9                          i++;
+ 460   9                          US[i] = M.u[0];
+ 461   9                          i++;
+ 462   9                        }
+ 463   8                        US[i] = M.u[1];
+ 464   8                        i++;
+ 465   8                        j = 0;
+ 466   8                      }
+ 467   7                    }
+ 468   6                    else
+ 469   6                    {
+ 470   7                      while(JS == 1)
+ 471   7                      {
+ 472   8                        if(T > 50000)
+ 473   8                        {
+ 474   9                          T = 0;
+ 475   9                          j++;
+ 476   9                          if(j > 30)
+ 477   9                          {
+ 478  10                            i = 756;
+ 479  10                            U1_sendS("CC<<", 4);//超时退出!大约20秒无操作退出!
+ 480  10                            break;
+ 481  10                          }
+ 482   9                        }
+ 483   8                      }
+ 484   7                    }
+ 485   6                  }
+ 486   5                  TR0 = 0;    //关闭定时器0
+ 487   5                  break;
+ 488   5                case 'D':   //温度
+C51 COMPILER V9.01   YUYIN                                                                 09/09/2013 19:00:55 PAGE 9   
 
- 489   4              if(strstr(US,"AP") != NULL)   //wifi工作在AP模式
- 490   4              {
- 491   5                Delay10ms();
- 492   5                U1_sendS("AT+WAKEY\r\n",10);
- 493   5              }
- 494   4              else if(strstr(US,"OPEN") != NULL) //AP模式下的open加密  
- 495   4              {
- 496   5                Check_wifi = 0;
- 497   5                Wifi_AP_OPEN_MODE = 1;
- 498   5                if(start_wifi_data())
- 499   5                {
- 500   6                  Check_wifi = 0;
- 501   6                  Wifi_Command_Mode = 0;
- 502   6                }
- 503   5                //wifi_ap_open_led_blink();
- 504   5              }
- 505   4              else
- 506   4              {
- 507   5                if(start_wifi_data())
- 508   5                {
- 509   6                  Check_wifi = 0;
- 510   6                  Wifi_Command_Mode = 0;
- 511   6                  Wifi_AP_OPEN_MODE = 0;
- 512   6                }
- 513   5              }
- 514   4            }
- 515   3          }
- 516   2          US[2] = 0x00;//一个串口命令执行完毕, 清空
- 517   2        }
- 518   1      }
+ 489   5                    if(US[1] == 'T')
+ 490   5                    {
+ 491   6                      memset(US,0x00,sizeof(US));
+ 492   6                      US[0] = 'D';
+ 493   6                      US[1] = 'T';
+ 494   6                      while((US[2] = GetTemperature()) == 0x55);
+ 495   6                      US[3] = '<';
+ 496   6                      US[4] = '<';
+ 497   6                      U1_sendS(US, 5);
+ 498   6                    }
+ 499   5                    else if(US[1] == 'S') //wifi复位
+ 500   5                    {
+ 501   6                      Check_wifi = 1;
+ 502   6                      Wifi_Command_Mode = 0;
+ 503   6                      U1_sendS("DS<<",4);
+ 504   6                    }
+ 505   5                    break;
+ 506   5                case 'L': //唤醒状态指示灯
+ 507   5                    if(US[1] == 'B')
+ 508   5                    {
+ 509   6                      WAKEUP_LED = LED_ON;
+ 510   6                      U1_sendS("LB<<",4);
+ 511   6                    } 
+ 512   5                    else if(US[1] == 'D')
+ 513   5                    {
+ 514   6                      WAKEUP_LED = LED_OFF;
+ 515   6                      U1_sendS("LD<<",4);
+ 516   6                    }
+ 517   5                    break;
+ 518   5                default:break;  
+ 519   5              }
+ 520   4            }
+ 521   3            else if(strstr(US,"+o") != NULL) //收到wifi模块返回的数据 +ok
+ 522   3            {
+ 523   4              if(strstr(US,"AP") != NULL)   //wifi工作在AP模式
+ 524   4              {
+ 525   5                Delay10ms();
+ 526   5                U1_sendS("AT+WAKEY\r\n",10);
+ 527   5              }
+ 528   4              else if(strstr(US,"OPEN") != NULL) //AP模式下的open加密  
+ 529   4              {
+ 530   5                Check_wifi = 0;
+ 531   5                Wifi_AP_OPEN_MODE = 1;
+ 532   5                TR1 = 1;
+ 533   5                if(start_wifi_data())
+ 534   5                {
+ 535   6                  Check_wifi = 0;
+ 536   6                  Wifi_Command_Mode = 0;
+ 537   6                }
+ 538   5              }
+ 539   4              else
+ 540   4              {
+ 541   5                start_wifi_data();
+ 542   5                Check_wifi = 0;
+ 543   5                TR1 = 0;
+ 544   5                Wifi_Command_Mode = 0;
+ 545   5                Wifi_AP_OPEN_MODE = 0;
+ 546   5              }
+ 547   4            }
+ 548   3          }
+ 549   2          US[2] = 0x00;//一个串口命令执行完毕, 清空
+ 550   2        }
+C51 COMPILER V9.01   YUYIN                                                                 09/09/2013 19:00:55 PAGE 10  
+
+ 551   1      }
 
 
 MODULE INFORMATION:   STATIC OVERLAYABLE
-   CODE SIZE        =   1652    ----
+   CODE SIZE        =   1695    ----
    CONSTANT SIZE    =     91    ----
    XDATA SIZE       =    800    ----
    PDATA SIZE       =   ----    ----
-   DATA SIZE        =     15       5
+   DATA SIZE        =     17       5
    IDATA SIZE       =      2    ----
-   BIT SIZE         =      4    ----
+   BIT SIZE         =      3    ----
 END OF MODULE INFORMATION.
 
 

@@ -17,7 +17,7 @@ sbit RST = P1 ^ 4; //wifi复位RST
 bit F = 0;	  //是否打开38KH方波调制
 bit Wifi_Command_Mode = 0; //=1 wifi工作在命令模式 =0 工作在数据传输模式
 bit Check_wifi = 1;
-bit Wifi_AP_OPEN_MODE = 0;
+unsigned int Wifi_AP_OPEN_MODE = 0;
 unsigned int RST_count1 = 0; //计数
 unsigned int RST_count2 = 0;
 unsigned char Temperature = 0; //温度
@@ -144,6 +144,7 @@ void Delay10ms()		//@22.1184MHz
 	} while (--i);
 }
 
+/*
 void Delay100ms()		//@22.1184MHz
 {
 	unsigned char i, j, k;
@@ -159,18 +160,53 @@ void Delay100ms()		//@22.1184MHz
 		} while (--j);
 	} while (--i);
 }
+*/
 
+void Timer1Init(void)		//5毫秒@22.1184MHz
+{
+	AUXR &= 0xBF;		//定时器时钟12T模式
+	TMOD &= 0x0F;		//设置定时器模式
+	TMOD |= 0x10;		//设置定时器模式
+	TL1 = 0x00;		//设置定时初值
+	TH1 = 0xDC;		//设置定时初值
+	TF1 = 0;		//清除TF1标志
+	TR1 = 1;		//定时器1开始计时
+	
+	ET1 =1;
+	EA = 1;
+}
+
+
+void T1() interrupt 3 using 3
+{
+	if(Wifi_AP_OPEN_MODE)
+	{
+		//U1_send('2');
+		Wifi_AP_OPEN_MODE++;
+		if(Wifi_AP_OPEN_MODE == 50)
+		{
+			//U1_send('3');
+			WIFI_LED = !WIFI_LED;
+			Wifi_AP_OPEN_MODE = 1;
+		}
+	}
+	TL1 = 0x00;		//设置定时初值
+	TH1 = 0xDC;		//设置定时初值	
+	TR1 = 1;		//定时器1开始计时	
+}
+
+/*
 void wifi_ap_open_led_blink()
 {
 	//灯闪烁处理
 	WIFI_LED = !WIFI_LED;
-	Delay100ms();
-	Delay100ms();
+	//Delay100ms();
+	Delay50ms();
 	WIFI_LED = !WIFI_LED;	
-	Delay100ms();
-	Delay100ms();	
+	Delay50ms();
+	//Delay100ms();	
 }
-
+*/
 int start_wifi_command()
 {
 	U1_sendS("+++",3);
@@ -214,6 +250,7 @@ void main (void)
 	WAKEUP_LED = LED_OFF;
 	U1Init();
 	T0Init();	
+	Timer1Init();
 	Rstinit();
 	Init_DS18B20();	
 	//CH:<< 			红外采集命令		//CH:长度+数据<<	//采集后返回的数据
@@ -232,15 +269,17 @@ void main (void)
 			}
 			if(Wifi_Command_Mode)
 			{
-				//Delay50ms();
 				Delay10ms();
 				U1_sendS("AT+WMODE\r\n",10);
 				Check_wifi = 0;	
 			}
 		}	
-		WIFI_LED = RST;	
+		if(!Wifi_AP_OPEN_MODE)
+			WIFI_LED = RST;	
 		if(RST == 0)
 		{
+			TR1 = 0;
+			WIFI_LED = RST;
 			while(RST == 0)
 			{
 				RST_count1++;
@@ -257,11 +296,8 @@ void main (void)
 				RST_count1 = 0;
 				RST_count2 = 0;
 			}	
+			TR1 = 1;
 		}	
-		if(Wifi_AP_OPEN_MODE == 1)
-		{
-			wifi_ap_open_led_blink();
-		}
 		if(RI==1)
 		{
 			U1_in();//获取串口发送的SJ数据!
@@ -460,6 +496,12 @@ void main (void)
 								US[4] = '<';
 								U1_sendS(US, 5);
 							}
+							else if(US[1] == 'S') //wifi复位
+							{
+								Check_wifi = 1;
+								Wifi_Command_Mode = 0;
+								U1_sendS("DS<<",4);
+							}
 							break;
 					case 'L': //唤醒状态指示灯
 							if(US[1] == 'B')
@@ -471,14 +513,6 @@ void main (void)
 							{
 								WAKEUP_LED = LED_OFF;
 								U1_sendS("LD<<",4);
-							}
-							break;
-					case 'S': //wifi复位
-							if(US[1] == 'D')
-							{
-								Check_wifi = 1;
-								Wifi_Command_Mode = 0;
-								U1_sendS("SD<<",4);
 							}
 							break;
 					default:break;	
@@ -495,21 +529,20 @@ void main (void)
 				{
 					Check_wifi = 0;
 					Wifi_AP_OPEN_MODE = 1;
+					TR1 = 1;
 					if(start_wifi_data())
 					{
 						Check_wifi = 0;
 						Wifi_Command_Mode = 0;
 					}
-					//wifi_ap_open_led_blink();
 				}
 				else
 				{
-					if(start_wifi_data())
-					{
-						Check_wifi = 0;
-						Wifi_Command_Mode = 0;
-						Wifi_AP_OPEN_MODE = 0;
-					}
+					start_wifi_data();
+					Check_wifi = 0;
+					TR1 = 0;
+					Wifi_Command_Mode = 0;
+					Wifi_AP_OPEN_MODE = 0;
 				}
 			}
 		}
