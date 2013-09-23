@@ -173,6 +173,7 @@ void T1() interrupt 3 using 3
 			Wifi_AP_OPEN_MODE = 1;
 		}
 	}
+	/*
 	else
 	{
 		Wifi_MAC_Count++;
@@ -182,6 +183,7 @@ void T1() interrupt 3 using 3
 			Wifi_MAC_Count = 0;
 		}	
 	}
+	*/
 	TL1 = 0x00;		//设置定时初值
 	TH1 = 0xDC;		//设置定时初值	
 	TR1 = 1;		//定时器1开始计时	
@@ -500,6 +502,9 @@ void main (void)
 												Wifi_Command_Mode = 0;
 												U1_sendS("DS<<",4);
 												break;
+								case 'M'://获取wifiMAC地址
+												Get_Wifi_MAC = 1;
+												break;				
 								default:break;				
 							}
 							break;
