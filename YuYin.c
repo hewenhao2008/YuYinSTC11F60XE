@@ -16,8 +16,10 @@ sbit RST = P1 ^ 4; //wifi复位RST
 
 bit F = 0;	  //是否打开38KH方波调制
 bit Wifi_Command_Mode = 0; //=1 wifi工作在命令模式 =0 工作在数据传输模式
-bit Check_wifi = 1;
-unsigned int Wifi_AP_OPEN_MODE = 0;
+bit Check_wifi = 1;		//检测wifi工作模式
+bit Get_Wifi_MAC = 0; //检测wifi模块MAC地址标志，只在STA模式下检测
+unsigned int Wifi_MAC_Count = 0;
+unsigned int Wifi_AP_OPEN_MODE = 0; //wifi工作在AP的OPEN模式下，灯闪烁
 unsigned int RST_count1 = 0; //计数
 unsigned int RST_count2 = 0;
 unsigned char Temperature = 0; //温度
@@ -30,6 +32,7 @@ unsigned int c = 0;//计数用
 
 unsigned int ui = 0;//串口接收数据长度!
 xdata unsigned char US[800];//xdata unsigned char US[256]; //定义串口接收数据变量!
+xdata unsigned char Wifi_MAC[32] = 0x00;
 
 /*
 void Delay10us()		//@22.1184MHz
@@ -144,24 +147,6 @@ void Delay10ms()		//@22.1184MHz
 	} while (--i);
 }
 
-/*
-void Delay100ms()		//@22.1184MHz
-{
-	unsigned char i, j, k;
-
-	i = 9;
-	j = 104;
-	k = 139;
-	do
-	{
-		do
-		{
-			while (--k);
-		} while (--j);
-	} while (--i);
-}
-*/
-
 void Timer1Init(void)		//5毫秒@22.1184MHz
 {
 	AUXR &= 0xBF;		//定时器时钟12T模式
@@ -181,32 +166,27 @@ void T1() interrupt 3 using 3
 {
 	if(Wifi_AP_OPEN_MODE)
 	{
-		//U1_send('2');
 		Wifi_AP_OPEN_MODE++;
 		if(Wifi_AP_OPEN_MODE == 50)
 		{
-			//U1_send('3');
 			WIFI_LED = !WIFI_LED;
 			Wifi_AP_OPEN_MODE = 1;
 		}
+	}
+	else
+	{
+		Wifi_MAC_Count++;
+		if(Wifi_MAC_Count == 200*60*5) //5分钟定时
+		{
+			Get_Wifi_MAC = 1;
+			Wifi_MAC_Count = 0;
+		}	
 	}
 	TL1 = 0x00;		//设置定时初值
 	TH1 = 0xDC;		//设置定时初值	
 	TR1 = 1;		//定时器1开始计时	
 }
 
-/*
-void wifi_ap_open_led_blink()
-{
-	//灯闪烁处理
-	WIFI_LED = !WIFI_LED;
-	//Delay100ms();
-	Delay50ms();
-	WIFI_LED = !WIFI_LED;	
-	Delay50ms();
-	//Delay100ms();	
-}
-*/
 int start_wifi_command()
 {
 	U1_sendS("+++",3);
@@ -263,6 +243,7 @@ void main (void)
 	{
 		if(Check_wifi)
 		{
+			TR1 = 0;
 			if(!Wifi_Command_Mode)
 			{
 				start_wifi_command();
@@ -270,12 +251,28 @@ void main (void)
 			if(Wifi_Command_Mode)
 			{
 				Delay10ms();
-				U1_sendS("AT+WMODE\r\n",10);
+				U1_sendS("AT+WMODE\r\n",10);	
 				Check_wifi = 0;	
 			}
+			TR1 = 1;
 		}	
 		if(!Wifi_AP_OPEN_MODE)
+		{
 			WIFI_LED = RST;	
+			if(Get_Wifi_MAC)
+			{
+				TR1 = 0;
+				if(!Wifi_Command_Mode)
+				{
+					start_wifi_command();
+				}
+				if(Wifi_Command_Mode)
+				{
+					Delay10ms();
+					U1_sendS("AT+NMAC\r\n",9);	
+				}
+			}
+		}
 		if(RST == 0)
 		{
 			TR1 = 0;
@@ -292,6 +289,7 @@ void main (void)
 			if(RST_count2 >= 5)
 			{
 				Wifi_Command_Mode = 0;
+				Get_Wifi_MAC = 0;
 				Check_wifi = 1;
 				RST_count1 = 0;
 				RST_count2 = 0;
@@ -301,9 +299,9 @@ void main (void)
 		if(RI==1)
 		{
 			U1_in();//获取串口发送的SJ数据!
-
 			if(US[2] == ':')//接收到正确的控制数据!
 			{
+				TR1 = 0;
 				switch(US[0])
 				{
 					case 'F'://红外、无线数据发射!
@@ -485,22 +483,24 @@ void main (void)
 						}
 						TR0 = 0;		//关闭定时器0
 						break;
-					case 'D':		//温度
-							if(US[1] == 'T')
+					case 'D':
+							switch(US[1])
 							{
-								memset(US,0x00,sizeof(US));
-								US[0] = 'D';
-								US[1] = 'T';
-								while((US[2] = GetTemperature()) == 0x55);
-								US[3] = '<';
-								US[4] = '<';
-								U1_sendS(US, 5);
-							}
-							else if(US[1] == 'S') //wifi复位
-							{
-								Check_wifi = 1;
-								Wifi_Command_Mode = 0;
-								U1_sendS("DS<<",4);
+								case 'T'://温度
+												memset(US,0x00,sizeof(US));
+												US[0] = 'D';
+												US[1] = 'T';
+												while((US[2] = GetTemperature()) == 0x55);
+												US[3] = '<';
+												US[4] = '<';
+												U1_sendS(US, 5);	
+												break;
+								case 'D'://wifi复位
+												Check_wifi = 1;
+												Wifi_Command_Mode = 0;
+												U1_sendS("DS<<",4);
+												break;
+								default:break;				
 							}
 							break;
 					case 'L': //唤醒状态指示灯
@@ -517,6 +517,7 @@ void main (void)
 							break;
 					default:break;	
 				}
+				TR1 = 1;
 			}
 			else if(strstr(US,"+o") != NULL) //收到wifi模块返回的数据 +ok
 			{
@@ -530,19 +531,35 @@ void main (void)
 					Check_wifi = 0;
 					Wifi_AP_OPEN_MODE = 1;
 					TR1 = 1;
-					if(start_wifi_data())
+					if(!start_wifi_data())
 					{
 						Check_wifi = 0;
 						Wifi_Command_Mode = 0;
 					}
 				}
+				else if(strstr(US,"MAC") != NULL)
+				{
+					memset(Wifi_MAC,0x00,sizeof(Wifi_MAC));
+					memcpy(Wifi_MAC,&US[9],26);
+					if(!start_wifi_data())
+					{
+						Get_Wifi_MAC = 0;
+						Wifi_Command_Mode = 0;
+						U1_sendS("DM:",3);
+						U1_sendS(Wifi_MAC,26);
+						U1_sendS("<<",2);
+					}
+					Wifi_MAC_Count = 0;
+					TR1 = 1;
+				}
 				else
 				{
-					start_wifi_data();
-					Check_wifi = 0;
-					TR1 = 0;
-					Wifi_Command_Mode = 0;
-					Wifi_AP_OPEN_MODE = 0;
+					if(!start_wifi_data())
+					{
+						Check_wifi = 0;
+						Wifi_Command_Mode = 0;
+						Wifi_AP_OPEN_MODE = 0;
+					}
 				}
 			}
 		}
