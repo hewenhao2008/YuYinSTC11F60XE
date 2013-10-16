@@ -32,7 +32,8 @@ unsigned int c = 0;//计数用
 
 unsigned int ui = 0;//串口接收数据长度!
 xdata unsigned char US[800];//xdata unsigned char US[256]; //定义串口接收数据变量!
-xdata unsigned char Wifi_MAC[32] = 0x00;
+#define wifi_mac_num 16
+xdata unsigned char Wifi_MAC[wifi_mac_num] = 0x00;
 
 /*
 void Delay10us()		//@22.1184MHz
@@ -176,7 +177,7 @@ void T1() interrupt 3 using 3
 	else
 	{
 		Wifi_MAC_Count++;
-		if(Wifi_MAC_Count == 200*60*5) //5分钟定时
+		if(Wifi_MAC_Count == 200*60*5) //200*60*5 5分钟定时
 		{
 			Get_Wifi_MAC = 1;
 			Wifi_MAC_Count = 0;
@@ -495,7 +496,7 @@ void main (void)
 												US[4] = '<';
 												U1_sendS(US, 5);	
 												break;
-								case 'D'://wifi复位
+								case 'S'://wifi复位
 												Check_wifi = 1;
 												Wifi_Command_Mode = 0;
 												U1_sendS("DS<<",4);
@@ -540,13 +541,13 @@ void main (void)
 				else if(strstr(US,"MAC") != NULL)
 				{
 					memset(Wifi_MAC,0x00,sizeof(Wifi_MAC));
-					memcpy(Wifi_MAC,&US[9],26);
+					memcpy(Wifi_MAC,strstr(US,"+ok="),sizeof(Wifi_MAC));
 					if(!start_wifi_data())
 					{
 						Get_Wifi_MAC = 0;
 						Wifi_Command_Mode = 0;
 						U1_sendS("DM:",3);
-						U1_sendS(Wifi_MAC,26);
+						U1_sendS(Wifi_MAC,sizeof(Wifi_MAC));
 						U1_sendS("<<",2);
 					}
 					Wifi_MAC_Count = 0;
